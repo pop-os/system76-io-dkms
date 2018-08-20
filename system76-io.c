@@ -157,7 +157,8 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
 	memset(io_dev, 0, sizeof(struct io_dev));
 
     io_dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
-    io_dev->hwmon_dev = hwmon_device_register_with_groups(&io_dev->usb_dev->dev, "system76-io", io_dev, io_groups);
+
+    io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76-io", io_dev, io_groups);
 
     usb_set_intfdata(interface, io_dev);
 
