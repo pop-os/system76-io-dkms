@@ -1,0 +1,15 @@
+Source: system76-io-dkms
+Section: kernel
+Priority: optional
+Maintainer: Jeremy Soller <jeremy@system76.com>
+Build-Depends:
+  debhelper (>=9),
+  dkms
+Standards-Version: 4.1.1
+Homepage: https://github.com/pop-os/system76-io-dkms
+
+Package: system76-io-dkms
+Architecture: amd64
+Depends: ${misc:Depends}
+Description: System76 Io DKMS driver
+ This DKMS driver controls System76 Io devices
