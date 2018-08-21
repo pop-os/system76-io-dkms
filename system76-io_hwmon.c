@@ -17,12 +17,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-enum FanIndex {
-    FAN_CPU = 1,
-    FAN_INTAKE = 2,
-    FAN_EXHAUST = 3
-};
-
 #define IO_FAN(N, I)
 
 #define IO_FANS \
@@ -122,7 +116,6 @@ static ssize_t io_pwm_enable_show(struct device *dev, struct device_attribute *a
 static ssize_t io_pwm_enable_set(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
 	u8 value;
 	int result;
-
 
     const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
     if (name) {
