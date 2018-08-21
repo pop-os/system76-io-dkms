@@ -26,7 +26,7 @@
 
 #define IO_VENDOR 0x7676
 #define IO_DEVICE 0x7676
-#define IO_INTERFACE 0
+#define IO_INTERFACE 1
 #define IO_EP_IN 0x83
 #define IO_EP_OUT 0x04
 #define IO_MSG_SIZE 16
