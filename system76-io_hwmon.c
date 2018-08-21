@@ -48,7 +48,7 @@ static ssize_t io_fan_input_show(struct device *dev, struct device_attribute *at
             return result;
         }
 
-        return sprintf(buf, "%i\n", value);
+        return sprintf(buf, "%i\n", value * 30);
     } else {
         return -ENOENT;
     }

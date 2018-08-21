@@ -174,7 +174,7 @@ static int io_dev_tach(struct io_dev * io_dev, const char * device, u16 * value,
 
     result = io_dev_command(io_dev, io_dev->command, len, io_dev->response, IO_MSG_SIZE, timeout);
     if (result) {
-        dev_err(&io_dev->usb_dev->dev, "io_dev_tach failed: %s\n", io_dev->response);
+        dev_err(&io_dev->usb_dev->dev, "io_dev_tach failed: %d: %s\n", -result, io_dev->response);
         return result;
     }
 
@@ -196,7 +196,7 @@ static int io_dev_duty(struct io_dev * io_dev, const char * device, u16 * value,
 
     result = io_dev_command(io_dev, io_dev->command, len, io_dev->response, IO_MSG_SIZE, timeout);
     if (result) {
-        dev_err(&io_dev->usb_dev->dev, "io_dev_duty failed: %s\n", io_dev->response);
+        dev_err(&io_dev->usb_dev->dev, "io_dev_duty failed: %d: %s\n", -result, io_dev->response);
         return result;
     }
 
@@ -222,7 +222,7 @@ static int io_dev_set_duty(struct io_dev * io_dev, const char * device, u16 duty
 
     result = io_dev_command(io_dev, io_dev->command, len, io_dev->response, IO_MSG_SIZE, timeout);
     if (result) {
-        dev_err(&io_dev->usb_dev->dev, "io_dev_set_duty failed: %s\n", io_dev->response);
+        dev_err(&io_dev->usb_dev->dev, "io_dev_set_duty failed: %d: %s\n", -result, io_dev->response);
         return result;
     }
 

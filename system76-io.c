@@ -26,7 +26,9 @@
 
 #define IO_VENDOR 0x7676
 #define IO_DEVICE 0x7676
-#define IO_INTERFACE 1
+#define IO_INTF_CTRL 0
+#define IO_EP_CTRL 0x00
+#define IO_INTF_DATA 1
 #define IO_EP_IN 0x83
 #define IO_EP_OUT 0x04
 #define IO_MSG_SIZE 16
@@ -35,36 +37,88 @@
 #include "system76-io_dev.c"
 #include "system76-io_hwmon.c"
 
+#define BAUD 1000000
+
+static u8 line_encoding[7] = {
+    (u8)BAUD,
+    (u8)(BAUD >> 8),
+    (u8)(BAUD >> 16),
+    (u8)(BAUD >> 24),
+    0,
+    0,
+    8
+};
+
 static int io_probe(struct usb_interface *interface, const struct usb_device_id *id) {
+    int result;
     struct io_dev * io_dev;
 
 	dev_info(&interface->dev, "id %04X:%04X interface %d probe\n", id->idVendor, id->idProduct, id->bInterfaceNumber);
 
-	io_dev = kmalloc(sizeof(struct io_dev), GFP_KERNEL);
-	if (IS_ERR_OR_NULL(io_dev)) {
-		dev_err(&interface->dev, "kmalloc failed\n");
+    if (id->bInterfaceNumber == IO_INTF_CTRL) {
+        result = usb_control_msg(
+            interface_to_usbdev(interface),
+            usb_sndctrlpipe(interface_to_usbdev(interface), IO_EP_CTRL),
+            0x22,
+            0x21,
+            0x03,
+            0,
+            NULL,
+            0,
+            IO_TIMEOUT
+        );
+        if (result < 0) {
+            dev_err(&interface->dev, "set line state failed: %d\n", -result);
+            return result;
+        }
 
-        return -ENOMEM;
-	}
 
-	memset(io_dev, 0, sizeof(struct io_dev));
+        result = usb_control_msg(
+            interface_to_usbdev(interface),
+            usb_sndctrlpipe(interface_to_usbdev(interface), IO_EP_CTRL),
+            0x20,
+            0x21,
+            0,
+            0,
+            line_encoding,
+            7,
+            IO_TIMEOUT
+        );
+        if (result < 0) {
+            dev_err(&interface->dev, "set line encoding failed: %d\n", -result);
+            return result;
+        }
 
-    io_dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
+        return 0;
+    } else if (id->bInterfaceNumber == IO_INTF_DATA) {
+    	io_dev = kmalloc(sizeof(struct io_dev), GFP_KERNEL);
+    	if (IS_ERR_OR_NULL(io_dev)) {
+    		dev_err(&interface->dev, "kmalloc failed\n");
 
-    io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76_io", io_dev, io_groups);
-    if (IS_ERR(io_dev->hwmon_dev)) {
-		dev_err(&interface->dev, "hwmon_device_register_with_groups failed\n");
+            return -ENOMEM;
+    	}
 
-        usb_put_dev(io_dev->usb_dev);
+    	memset(io_dev, 0, sizeof(struct io_dev));
 
-        kfree(io_dev);
+        io_dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
 
-        return PTR_ERR(io_dev->hwmon_dev);
+        io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76_io", io_dev, io_groups);
+        if (IS_ERR(io_dev->hwmon_dev)) {
+    		dev_err(&interface->dev, "hwmon_device_register_with_groups failed\n");
+
+            usb_put_dev(io_dev->usb_dev);
+
+            kfree(io_dev);
+
+            return PTR_ERR(io_dev->hwmon_dev);
+        }
+
+        usb_set_intfdata(interface, io_dev);
+
+        return 0;
+    } else {
+        return -ENODEV;
     }
-
-    usb_set_intfdata(interface, io_dev);
-
-	return 0;
 }
 
 static void io_disconnect(struct usb_interface *interface) {
@@ -76,15 +130,18 @@ static void io_disconnect(struct usb_interface *interface) {
 
     usb_set_intfdata(interface, NULL);
 
-    hwmon_device_unregister(io_dev->hwmon_dev);
+    if (io_dev) {
+        hwmon_device_unregister(io_dev->hwmon_dev);
 
-    usb_put_dev(io_dev->usb_dev);
+        usb_put_dev(io_dev->usb_dev);
 
-    kfree(io_dev);
+        kfree(io_dev);
+    }
 }
 
 static struct usb_device_id io_table[] = {
-        { USB_DEVICE_INTERFACE_NUMBER(IO_VENDOR, IO_DEVICE, IO_INTERFACE) },
+        { USB_DEVICE_INTERFACE_NUMBER(IO_VENDOR, IO_DEVICE, IO_INTF_CTRL) },
+        { USB_DEVICE_INTERFACE_NUMBER(IO_VENDOR, IO_DEVICE, IO_INTF_DATA) },
         { }
 };
 
