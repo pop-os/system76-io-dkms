@@ -29,10 +29,6 @@ struct io_dev {
     struct device * hwmon_dev;
 };
 
-static ssize_t s76_hwmon_show_name(struct device *dev, struct device_attribute *attr, char *buf) {
-	return sprintf(buf, "system76-io\n");
-}
-
 static ssize_t io_fan_input_show(struct device *dev, struct device_attribute *attr, char *buf) {
 	int index = to_sensor_dev_attr(attr)->index;
 	return sprintf(buf, "%i\n", 1000);
@@ -100,7 +96,6 @@ static ssize_t io_pwm_enable_set(struct device *dev, struct device_attribute *at
 	return count;
 }
 
-static SENSOR_DEVICE_ATTR(name, S_IRUGO, s76_hwmon_show_name, NULL, 0);
 // CPU Fan
 static SENSOR_DEVICE_ATTR(fan1_input, S_IRUGO, io_fan_input_show, NULL, 0);
 static SENSOR_DEVICE_ATTR(fan1_label, S_IRUGO, io_fan_label_show, NULL, 0);
@@ -118,7 +113,6 @@ static SENSOR_DEVICE_ATTR(pwm3, S_IRUGO |  S_IWUSR, io_pwm_show, io_pwm_set, 2);
 static SENSOR_DEVICE_ATTR(pwm3_enable, S_IRUGO |  S_IWUSR, io_pwm_enable_show, io_pwm_enable_set, 2);
 
 static struct attribute *io_attrs[] = {
-	&sensor_dev_attr_name.dev_attr.attr,
 	&sensor_dev_attr_fan1_input.dev_attr.attr,
 	&sensor_dev_attr_fan1_label.dev_attr.attr,
 	&sensor_dev_attr_pwm1.dev_attr.attr,
@@ -134,23 +128,17 @@ static struct attribute *io_attrs[] = {
 	NULL
 };
 
-static const struct attribute_group io_group = {
-    .attrs = io_attrs
-};
-
-static const struct attribute_group * io_groups[] = {
-    &io_group,
-    NULL
-};
+ATTRIBUTE_GROUPS(io);
 
 static int io_probe(struct usb_interface *interface, const struct usb_device_id *id) {
     struct io_dev * io_dev;
 
-	dev_info(&interface->dev, "%04X:%04X probe\n", id->idVendor, id->idProduct);
+	dev_info(&interface->dev, "id %04X:%04X interface %d probe\n", id->idVendor, id->idProduct, id->bInterfaceNumber);
 
 	io_dev = kmalloc(sizeof(struct io_dev), GFP_KERNEL);
-	if (io_dev == NULL) {
+	if (IS_ERR_OR_NULL(io_dev)) {
 		dev_err(&interface->dev, "kmalloc failed\n");
+
         return -ENOMEM;
 	}
 
@@ -158,7 +146,16 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
 
     io_dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
 
-    io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76-io", io_dev, io_groups);
+    io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76_io", io_dev, io_groups);
+    if (IS_ERR(io_dev->hwmon_dev)) {
+		dev_err(&interface->dev, "hwmon_device_register_with_groups failed\n");
+
+        usb_put_dev(io_dev->usb_dev);
+
+        kfree(io_dev);
+
+        return PTR_ERR(io_dev->hwmon_dev);
+    }
 
     usb_set_intfdata(interface, io_dev);
 
