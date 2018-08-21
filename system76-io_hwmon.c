@@ -75,25 +75,29 @@ static ssize_t io_pwm_show(struct device *dev, struct device_attribute *attr, ch
             return result;
         }
 
-        return sprintf(buf, "%i\n", (value * 255) / 10000);
+        return sprintf(buf, "%i\n", (((u32)value) * 255) / 10000);
     } else {
         return -ENOENT;
     }
 }
 
 static ssize_t io_pwm_set(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
-	u8 value;
+	u32 value;
 	int result;
 
     struct io_dev * io_dev = dev_get_drvdata(dev);
     const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
     if (name) {
-    	result = kstrtou8(buf, 10, &value);
+    	result = kstrtou32(buf, 10, &value);
     	if (result) {
             return result;
         }
 
-        result = io_dev_set_duty(io_dev, name, value, IO_TIMEOUT);
+        if (value > 255) {
+            return -EINVAL;
+        }
+
+        result = io_dev_set_duty(io_dev, name, (u16)((value * 10000) / 255), IO_TIMEOUT);
         if (result) {
             return result;
         }
