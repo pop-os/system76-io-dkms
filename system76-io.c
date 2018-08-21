@@ -179,7 +179,7 @@ static void io_disconnect(struct usb_interface *interface) {
 }
 
 static struct usb_device_id io_table[] = {
-        { USB_DEVICE(0x7676, 0x7676) },
+        { USB_DEVICE_INTERFACE_NUMBER(0x7676, 0x7676, 0) },
         { }
 };
 
