@@ -24,111 +24,16 @@
 #include <linux/slab.h>
 #include <linux/usb.h>
 
-struct io_dev {
-    struct usb_device * usb_dev;
-    struct device * hwmon_dev;
-};
+#define IO_VENDOR 0x7676
+#define IO_DEVICE 0x7676
+#define IO_INTERFACE 0
+#define IO_EP_IN 0x83
+#define IO_EP_OUT 0x04
+#define IO_MSG_SIZE 16
+#define IO_TIMEOUT 1000
 
-static ssize_t io_fan_input_show(struct device *dev, struct device_attribute *attr, char *buf) {
-	int index = to_sensor_dev_attr(attr)->index;
-	return sprintf(buf, "%i\n", 1000);
-}
-
-static ssize_t io_fan_label_show(struct device *dev, struct device_attribute *attr, char *buf) {
-	switch (to_sensor_dev_attr(attr)->index) {
-	case 0:
-		return sprintf(buf, "CPU fan\n");
-	case 1:
-		return sprintf(buf, "Intake fan\n");
-	case 2:
-		return sprintf(buf, "Exhaust fan\n");
-	}
-	return 0;
-}
-
-static ssize_t io_pwm_show(struct device *dev, struct device_attribute *attr, char *buf) {
-	int index = to_sensor_dev_attr(attr)->index;
-	return sprintf(buf, "%i\n", 255);
-}
-
-static ssize_t io_pwm_set(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
-	u32 value;
-	int err;
-	int index = to_sensor_dev_attr(attr)->index;
-
-	err = kstrtou32(buf, 10, &value);
-	if (err) {
-        return err;
-    }
-
-    if (value > 255) {
-        return -EINVAL;
-    }
-
-	return count;
-}
-
-static ssize_t io_pwm_enable_show(struct device *dev, struct device_attribute *attr, char *buf) {
-	int index = to_sensor_dev_attr(attr)->index;
-	return sprintf(buf, "%i\n", 0);
-}
-
-static ssize_t io_pwm_enable_set(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
-	u32 value;
-	int err;
-	int index = to_sensor_dev_attr(attr)->index;
-
-	err = kstrtou32(buf, 10, &value);
-	if (err) {
-        return err;
-    }
-
-	if (value == 0) {
-
-	} else if (value == 1) {
-
-	} else if (value == 2) {
-
-	} else {
-        return -EINVAL;
-    }
-
-	return count;
-}
-
-// CPU Fan
-static SENSOR_DEVICE_ATTR(fan1_input, S_IRUGO, io_fan_input_show, NULL, 0);
-static SENSOR_DEVICE_ATTR(fan1_label, S_IRUGO, io_fan_label_show, NULL, 0);
-static SENSOR_DEVICE_ATTR(pwm1, S_IRUGO |  S_IWUSR, io_pwm_show, io_pwm_set, 0);
-static SENSOR_DEVICE_ATTR(pwm1_enable, S_IRUGO |  S_IWUSR, io_pwm_enable_show, io_pwm_enable_set, 0);
-// Intake Fan
-static SENSOR_DEVICE_ATTR(fan2_input, S_IRUGO, io_fan_input_show, NULL, 1);
-static SENSOR_DEVICE_ATTR(fan2_label, S_IRUGO, io_fan_label_show, NULL, 1);
-static SENSOR_DEVICE_ATTR(pwm2, S_IRUGO |  S_IWUSR, io_pwm_show, io_pwm_set, 1);
-static SENSOR_DEVICE_ATTR(pwm2_enable, S_IRUGO |  S_IWUSR, io_pwm_enable_show, io_pwm_enable_set, 1);
-// Exhaust Fan
-static SENSOR_DEVICE_ATTR(fan3_input, S_IRUGO, io_fan_input_show, NULL, 2);
-static SENSOR_DEVICE_ATTR(fan3_label, S_IRUGO, io_fan_label_show, NULL, 2);
-static SENSOR_DEVICE_ATTR(pwm3, S_IRUGO |  S_IWUSR, io_pwm_show, io_pwm_set, 2);
-static SENSOR_DEVICE_ATTR(pwm3_enable, S_IRUGO |  S_IWUSR, io_pwm_enable_show, io_pwm_enable_set, 2);
-
-static struct attribute *io_attrs[] = {
-	&sensor_dev_attr_fan1_input.dev_attr.attr,
-	&sensor_dev_attr_fan1_label.dev_attr.attr,
-	&sensor_dev_attr_pwm1.dev_attr.attr,
-	&sensor_dev_attr_pwm1_enable.dev_attr.attr,
-	&sensor_dev_attr_fan2_input.dev_attr.attr,
-	&sensor_dev_attr_fan2_label.dev_attr.attr,
-	&sensor_dev_attr_pwm2.dev_attr.attr,
-	&sensor_dev_attr_pwm2_enable.dev_attr.attr,
-	&sensor_dev_attr_fan3_input.dev_attr.attr,
-	&sensor_dev_attr_fan3_label.dev_attr.attr,
-	&sensor_dev_attr_pwm3.dev_attr.attr,
-	&sensor_dev_attr_pwm3_enable.dev_attr.attr,
-	NULL
-};
-
-ATTRIBUTE_GROUPS(io);
+#include "system76-io_dev.c"
+#include "system76-io_hwmon.c"
 
 static int io_probe(struct usb_interface *interface, const struct usb_device_id *id) {
     struct io_dev * io_dev;
@@ -179,7 +84,7 @@ static void io_disconnect(struct usb_interface *interface) {
 }
 
 static struct usb_device_id io_table[] = {
-        { USB_DEVICE_INTERFACE_NUMBER(0x7676, 0x7676, 0) },
+        { USB_DEVICE_INTERFACE_NUMBER(IO_VENDOR, IO_DEVICE, IO_INTERFACE) },
         { }
 };
 
