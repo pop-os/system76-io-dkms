@@ -24,8 +24,8 @@
 #include <linux/slab.h>
 #include <linux/usb.h>
 
-#define IO_VENDOR 0x7676
-#define IO_DEVICE 0x7676
+#define IO_VENDOR 0x1209
+#define IO_DEVICE 0x1776
 #define IO_INTF_CTRL 0
 #define IO_EP_CTRL 0x00
 #define IO_INTF_DATA 1
