@@ -22,6 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/suspend.h>
 #include <linux/usb.h>
 
 #define IO_VENDOR 0x1209
@@ -48,6 +49,31 @@ static u8 line_encoding[7] = {
     0,
     8
 };
+
+#ifdef CONFIG_PM_SLEEP
+static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
+    struct io_dev * io_dev = container_of(nb, struct io_dev, pm_notifier);
+
+    switch (action) {
+        case PM_HIBERNATION_PREPARE:
+        case PM_SUSPEND_PREPARE:
+            io_dev_set_suspend(io_dev, 1, IO_TIMEOUT);
+            break;
+
+        case PM_POST_HIBERNATION:
+        case PM_POST_SUSPEND:
+            io_dev_set_suspend(io_dev, 0, IO_TIMEOUT);
+            break;
+
+        case PM_POST_RESTORE:
+        case PM_RESTORE_PREPARE:
+        default:
+            break;
+    }
+
+    return NOTIFY_DONE;
+}
+#endif
 
 static int io_probe(struct usb_interface *interface, const struct usb_device_id *id) {
     int result;
@@ -113,6 +139,11 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
             return PTR_ERR(io_dev->hwmon_dev);
         }
 
+#ifdef CONFIG_PM_SLEEP
+        io_dev->pm_notifier.notifier_call = io_pm;
+        register_pm_notifier(&io_dev->pm_notifier);
+#endif
+
         usb_set_intfdata(interface, io_dev);
 
         return 0;
@@ -131,6 +162,10 @@ static void io_disconnect(struct usb_interface *interface) {
     usb_set_intfdata(interface, NULL);
 
     if (io_dev) {
+#ifdef CONFIG_PM_SLEEP
+        unregister_pm_notifier(&io_dev->pm_notifier);
+#endif
+
         hwmon_device_unregister(io_dev->hwmon_dev);
 
         usb_put_dev(io_dev->usb_dev);
