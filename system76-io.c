@@ -76,6 +76,7 @@ static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
 #endif
 
 static int io_probe(struct usb_interface *interface, const struct usb_device_id *id) {
+    int retry;
     int result;
     struct io_dev * io_dev;
 
@@ -120,7 +121,6 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
     	io_dev = kmalloc(sizeof(struct io_dev), GFP_KERNEL);
     	if (IS_ERR_OR_NULL(io_dev)) {
     		dev_err(&interface->dev, "kmalloc failed\n");
-
             return -ENOMEM;
     	}
 
@@ -128,15 +128,30 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
 
         io_dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
 
-        io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76_io", io_dev, io_groups);
-        if (IS_ERR(io_dev->hwmon_dev)) {
-    		dev_err(&interface->dev, "hwmon_device_register_with_groups failed\n");
-
+        for(retry = 0; retry < 8; retry++) {
+            dev_info(&interface->dev, "trying reset: %d\n", retry);
+            result = io_dev_reset(io_dev, IO_TIMEOUT);
+            if (result != -ETIMEDOUT) {
+                break;
+            }
+        }
+        if (result) {
             usb_put_dev(io_dev->usb_dev);
-
             kfree(io_dev);
 
-            return PTR_ERR(io_dev->hwmon_dev);
+            dev_err(&interface->dev, "io_dev_reset failed: %d\n", result);
+            return result;
+        }
+
+        io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76_io", io_dev, io_groups);
+        if (IS_ERR(io_dev->hwmon_dev)) {
+            result = PTR_ERR(io_dev->hwmon_dev);
+
+            usb_put_dev(io_dev->usb_dev);
+            kfree(io_dev);
+
+            dev_err(&interface->dev, "hwmon_device_register_with_groups failed: %d\n", result);
+            return result;
         }
 
 #ifdef CONFIG_PM_SLEEP
