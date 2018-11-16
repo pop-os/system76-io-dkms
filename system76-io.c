@@ -50,11 +50,11 @@ static u8 line_encoding[7] = {
     8
 };
 
-static ssize_t show_boot(struct device *dev, struct device_attribute *attr, char *buf) {
+static ssize_t show_bootloader(struct device *dev, struct device_attribute *attr, char *buf) {
     return sprintf(buf, "%d\n", 0);
 }
 
-static ssize_t set_boot(struct device *dev, struct device_attribute *attr, const char *buf, size_t size) {
+static ssize_t set_bootloader(struct device *dev, struct device_attribute *attr, const char *buf, size_t size) {
     struct io_dev * io_dev = dev_get_drvdata(dev);
 
     unsigned int val;
@@ -66,7 +66,7 @@ static ssize_t set_boot(struct device *dev, struct device_attribute *attr, const
     }
 
     if (val) {
-        ret = io_dev_boot(io_dev, IO_TIMEOUT);
+        ret = io_dev_bootloader(io_dev, IO_TIMEOUT);
         if(ret) {
             return ret;
         }
@@ -75,7 +75,7 @@ static ssize_t set_boot(struct device *dev, struct device_attribute *attr, const
     return size;
 }
 
-static DEVICE_ATTR(boot, S_IRUGO | S_IWUSR, show_boot, set_boot);
+static DEVICE_ATTR(bootloader, S_IRUGO | S_IWUSR, show_bootloader, set_bootloader);
 
 #ifdef CONFIG_PM_SLEEP
 static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
@@ -169,7 +169,7 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
             goto fail1;
         }
 
-        result = device_create_file(&interface->dev, &dev_attr_boot);
+        result = device_create_file(&interface->dev, &dev_attr_bootloader);
         if (result) {
             dev_err(&interface->dev, "device_create_file failed: %d\n", result);
             goto fail1;
@@ -191,7 +191,7 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
         return 0;
 
     fail2:
-        device_remove_file(&interface->dev, &dev_attr_boot);
+        device_remove_file(&interface->dev, &dev_attr_bootloader);
     fail1:
         usb_set_intfdata(interface, NULL);
         usb_put_dev(io_dev->usb_dev);
@@ -216,7 +216,7 @@ static void io_disconnect(struct usb_interface *interface) {
 
         hwmon_device_unregister(io_dev->hwmon_dev);
 
-        device_remove_file(&interface->dev, &dev_attr_boot);
+        device_remove_file(&interface->dev, &dev_attr_bootloader);
 
         usb_set_intfdata(interface, NULL);
 

@@ -162,7 +162,7 @@ static int io_dev_command(struct io_dev * io_dev, const char * command, size_t c
     }
 }
 
-static int io_dev_boot(struct io_dev * io_dev, int timeout) {
+static int io_dev_bootloader(struct io_dev * io_dev, int timeout) {
     int len;
     int result;
 
