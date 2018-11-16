@@ -162,6 +162,24 @@ static int io_dev_command(struct io_dev * io_dev, const char * command, size_t c
     }
 }
 
+static int io_dev_boot(struct io_dev * io_dev, int timeout) {
+    int len;
+    int result;
+
+    len = snprintf(io_dev->command, IO_MSG_SIZE, "IoBOOT\r");
+    if (len >= IO_MSG_SIZE) {
+        return -EINVAL;
+    }
+
+    result = io_dev_command(io_dev, io_dev->command, len, io_dev->response, IO_MSG_SIZE, timeout);
+    if (result) {
+        dev_err(&io_dev->usb_dev->dev, "io_dev_boot failed: %d: %s\n", -result, io_dev->response);
+        return result;
+    }
+
+    return 0;
+}
+
 static int io_dev_reset(struct io_dev * io_dev, int timeout) {
     int len;
     int result;
