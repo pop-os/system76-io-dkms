@@ -50,6 +50,33 @@ static u8 line_encoding[7] = {
     8
 };
 
+static ssize_t show_boot(struct device *dev, struct device_attribute *attr, char *buf) {
+    return sprintf(buf, "%d\n", 0);
+}
+
+static ssize_t set_boot(struct device *dev, struct device_attribute *attr, const char *buf, size_t size) {
+    struct io_dev * io_dev = dev_get_drvdata(dev);
+
+    unsigned int val;
+    int ret;
+
+    ret = kstrtouint(buf, 10, &val);
+    if (ret) {
+        return ret;
+    }
+
+    if (val) {
+        ret = io_dev_boot(io_dev, IO_TIMEOUT);
+        if(ret) {
+            return ret;
+        }
+    }
+
+    return size;
+}
+
+static DEVICE_ATTR(boot, S_IRUGO | S_IWUSR, show_boot, set_boot);
+
 #ifdef CONFIG_PM_SLEEP
 static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
     struct io_dev * io_dev = container_of(nb, struct io_dev, pm_notifier);
@@ -80,7 +107,7 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
     int result;
     struct io_dev * io_dev;
 
-	dev_info(&interface->dev, "id %04X:%04X interface %d probe\n", id->idVendor, id->idProduct, id->bInterfaceNumber);
+    dev_info(&interface->dev, "id %04X:%04X interface %d probe\n", id->idVendor, id->idProduct, id->bInterfaceNumber);
 
     if (id->bInterfaceNumber == IO_INTF_CTRL) {
         result = usb_control_msg(
@@ -118,15 +145,17 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
 
         return 0;
     } else if (id->bInterfaceNumber == IO_INTF_DATA) {
-    	io_dev = kmalloc(sizeof(struct io_dev), GFP_KERNEL);
-    	if (IS_ERR_OR_NULL(io_dev)) {
-    		dev_err(&interface->dev, "kmalloc failed\n");
+        io_dev = kmalloc(sizeof(struct io_dev), GFP_KERNEL);
+        if (IS_ERR_OR_NULL(io_dev)) {
+            dev_err(&interface->dev, "kmalloc failed\n");
             return -ENOMEM;
-    	}
+        }
 
-    	memset(io_dev, 0, sizeof(struct io_dev));
+        memset(io_dev, 0, sizeof(struct io_dev));
 
         io_dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
+
+        usb_set_intfdata(interface, io_dev);
 
         for(retry = 0; retry < 8; retry++) {
             dev_info(&interface->dev, "trying reset: %d\n", retry);
@@ -136,22 +165,22 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
             }
         }
         if (result) {
-            usb_put_dev(io_dev->usb_dev);
-            kfree(io_dev);
-
             dev_err(&interface->dev, "io_dev_reset failed: %d\n", result);
-            return result;
+            goto fail1;
+        }
+
+        result = device_create_file(&interface->dev, &dev_attr_boot);
+        if (result) {
+            dev_err(&interface->dev, "device_create_file failed: %d\n", result);
+            goto fail1;
         }
 
         io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76_io", io_dev, io_groups);
         if (IS_ERR(io_dev->hwmon_dev)) {
             result = PTR_ERR(io_dev->hwmon_dev);
 
-            usb_put_dev(io_dev->usb_dev);
-            kfree(io_dev);
-
             dev_err(&interface->dev, "hwmon_device_register_with_groups failed: %d\n", result);
-            return result;
+            goto fail2;
         }
 
 #ifdef CONFIG_PM_SLEEP
@@ -159,9 +188,15 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
         register_pm_notifier(&io_dev->pm_notifier);
 #endif
 
-        usb_set_intfdata(interface, io_dev);
-
         return 0;
+
+    fail2:
+        device_remove_file(&interface->dev, &dev_attr_boot);
+    fail1:
+        usb_set_intfdata(interface, NULL);
+        usb_put_dev(io_dev->usb_dev);
+        kfree(io_dev);
+        return result;
     } else {
         return -ENODEV;
     }
@@ -170,11 +205,9 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
 static void io_disconnect(struct usb_interface *interface) {
     struct io_dev * io_dev;
 
-	dev_info(&interface->dev, "disconnect\n");
+    dev_info(&interface->dev, "disconnect\n");
 
     io_dev = usb_get_intfdata(interface);
-
-    usb_set_intfdata(interface, NULL);
 
     if (io_dev) {
 #ifdef CONFIG_PM_SLEEP
@@ -182,6 +215,10 @@ static void io_disconnect(struct usb_interface *interface) {
 #endif
 
         hwmon_device_unregister(io_dev->hwmon_dev);
+
+        device_remove_file(&interface->dev, &dev_attr_boot);
+
+        usb_set_intfdata(interface, NULL);
 
         usb_put_dev(io_dev->usb_dev);
 
@@ -198,18 +235,18 @@ static struct usb_device_id io_table[] = {
 MODULE_DEVICE_TABLE(usb, io_table);
 
 static struct usb_driver io_driver = {
-	.name        = "system76-io",
-	.probe       = io_probe,
-	.disconnect  = io_disconnect,
-	.id_table    = io_table,
+    .name        = "system76-io",
+    .probe       = io_probe,
+    .disconnect  = io_disconnect,
+    .id_table    = io_table,
 };
 
 static int __init io_init(void) {
-	return usb_register(&io_driver);
+    return usb_register(&io_driver);
 }
 
 static void __exit io_exit(void) {
-	usb_deregister(&io_driver);
+    usb_deregister(&io_driver);
 }
 
 module_init(io_init);
