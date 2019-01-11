@@ -21,8 +21,7 @@
 
 #define IO_FANS \
     IO_FAN(CPUF, 1) \
-    IO_FAN(INTF, 2) \
-    IO_FAN(EXHF, 3)
+    IO_FAN(INTF, 2)
 
 static const char * io_fan_name(int index) {
     switch (index) {
