@@ -32,7 +32,7 @@
 #define IO_INTF_DATA 1
 #define IO_EP_IN 0x83
 #define IO_EP_OUT 0x04
-#define IO_MSG_SIZE 16
+#define IO_MSG_SIZE 32
 #define IO_TIMEOUT 1000
 
 #include "system76-io_dev.c"
