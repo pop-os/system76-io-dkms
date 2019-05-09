@@ -323,5 +323,5 @@ static int io_dev_revision(struct io_dev * io_dev, char * value, int value_len, 
         return result;
     }
 
-    return 0;
+    return strlen(value);
 }
