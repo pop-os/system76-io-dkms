@@ -18,6 +18,7 @@
  */
 
 struct io_dev {
+    struct mutex lock;
     struct usb_device * usb_dev;
     struct device * hwmon_dev;
 #ifdef CONFIG_PM_SLEEP

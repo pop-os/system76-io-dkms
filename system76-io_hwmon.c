@@ -37,104 +37,125 @@ static const char * io_fan_name(int index) {
 
 static ssize_t io_fan_input_show(struct device *dev, struct device_attribute *attr, char *buf) {
     u16 value;
-    int result;
+    int ret;
 
     struct io_dev * io_dev = dev_get_drvdata(dev);
+
+    mutex_lock(&io_dev->lock);
+
     const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
     if (name) {
-        result = io_dev_tach(io_dev, name, &value, IO_TIMEOUT);
-        if (result) {
-            return result;
+        ret = io_dev_tach(io_dev, name, &value, IO_TIMEOUT);
+        if (!ret) {
+            ret = sprintf(buf, "%i\n", value * 30);
         }
-
-        return sprintf(buf, "%i\n", value * 30);
     } else {
-        return -ENOENT;
+        ret = -ENOENT;
     }
+
+    mutex_unlock(&io_dev->lock);
+
+    return ret;
 }
 
 static ssize_t io_fan_label_show(struct device *dev, struct device_attribute *attr, char *buf) {
+    int ret;
+
     const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
     if (name) {
-        return sprintf(buf, "%s\n", name);
+        ret = sprintf(buf, "%s\n", name);
     } else {
-        return -ENOENT;
+        ret = -ENOENT;
     }
+
+    return ret;
 }
 
 static ssize_t io_pwm_show(struct device *dev, struct device_attribute *attr, char *buf) {
     u16 value;
-    int result;
+    int ret;
 
     struct io_dev * io_dev = dev_get_drvdata(dev);
+
+    mutex_lock(&io_dev->lock);
+
     const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
     if (name) {
-        result = io_dev_duty(io_dev, name, &value, IO_TIMEOUT);
-        if (result) {
-            return result;
+        ret = io_dev_duty(io_dev, name, &value, IO_TIMEOUT);
+        if (!ret) {
+            ret = sprintf(buf, "%i\n", (((u32)value) * 255) / 10000);
         }
-
-        return sprintf(buf, "%i\n", (((u32)value) * 255) / 10000);
     } else {
-        return -ENOENT;
+        ret = -ENOENT;
     }
+
+    mutex_unlock(&io_dev->lock);
+
+    return ret;
 }
 
 static ssize_t io_pwm_set(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
-	u32 value;
-	int result;
+  	u32 value;
+  	int ret;
 
     struct io_dev * io_dev = dev_get_drvdata(dev);
+
+    mutex_lock(&io_dev->lock);
+
     const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
     if (name) {
-    	result = kstrtou32(buf, 10, &value);
-    	if (result) {
-            return result;
+      	ret = kstrtou32(buf, 10, &value);
+      	if (!ret) {
+            if (value <= 255) {
+                ret = io_dev_set_duty(io_dev, name, (u16)((value * 10000) / 255), IO_TIMEOUT);
+                if (!ret) {
+                    ret = count;
+                }
+            } else {
+                ret = -EINVAL;
+            }
         }
-
-        if (value > 255) {
-            return -EINVAL;
-        }
-
-        result = io_dev_set_duty(io_dev, name, (u16)((value * 10000) / 255), IO_TIMEOUT);
-        if (result) {
-            return result;
-        }
-
-        return count;
     } else {
-        return -ENOENT;
+        ret = -ENOENT;
     }
+
+    mutex_unlock(&io_dev->lock);
+
+    return ret;
 }
 
 static ssize_t io_pwm_enable_show(struct device *dev, struct device_attribute *attr, char *buf) {
+    int ret;
+
     const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
     if (name) {
-        return sprintf(buf, "%i\n", 1);
+        ret = sprintf(buf, "%i\n", 1);
     } else {
-        return -ENOENT;
+        ret = -ENOENT;
     }
+
+    return ret;
 }
 
 static ssize_t io_pwm_enable_set(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
-	u8 value;
-	int result;
+  	u8 value;
+  	int ret;
 
     const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
     if (name) {
-        result = kstrtou8(buf, 10, &value);
-    	if (result) {
-            return result;
-        }
-
-    	if (value == 1) {
-            return count;
-    	} else {
-            return -EINVAL;
+        ret = kstrtou8(buf, 10, &value);
+      	if (!ret) {
+            if (value == 1) {
+                ret = count;
+            } else {
+                ret = -EINVAL;
+            }
         }
     } else {
-        return -ENOENT;
+        ret = -ENOENT;
     }
+
+    return ret;
 }
 
 #undef IO_FAN

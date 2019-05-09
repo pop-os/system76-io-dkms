@@ -55,32 +55,42 @@ static ssize_t show_bootloader(struct device *dev, struct device_attribute *attr
 }
 
 static ssize_t set_bootloader(struct device *dev, struct device_attribute *attr, const char *buf, size_t size) {
-    struct io_dev * io_dev = dev_get_drvdata(dev);
-
     unsigned int val;
     int ret;
 
-    ret = kstrtouint(buf, 10, &val);
-    if (ret) {
-        return ret;
-    }
+    struct io_dev * io_dev = dev_get_drvdata(dev);
 
-    if (val) {
-        ret = io_dev_bootloader(io_dev, IO_TIMEOUT);
-        if(ret) {
-            return ret;
+    mutex_lock(&io_dev->lock);
+
+    ret = kstrtouint(buf, 10, &val);
+    if (!ret) {
+        if (val) {
+            ret = io_dev_bootloader(io_dev, IO_TIMEOUT);
+            if(!ret) {
+                ret = size;
+            }
         }
     }
 
-    return size;
+    mutex_unlock(&io_dev->lock);
+
+    return ret;
 }
 
 static DEVICE_ATTR(bootloader, S_IRUGO | S_IWUSR, show_bootloader, set_bootloader);
 
 static ssize_t show_revision(struct device *dev, struct device_attribute *attr, char *buf) {
+    int ret;
+
     struct io_dev * io_dev = dev_get_drvdata(dev);
 
-    return io_dev_revision(io_dev, buf, PAGE_SIZE, IO_TIMEOUT);
+    mutex_lock(&io_dev->lock);
+
+    ret = io_dev_revision(io_dev, buf, PAGE_SIZE, IO_TIMEOUT);
+
+    mutex_unlock(&io_dev->lock);
+
+    return ret;
 }
 
 static DEVICE_ATTR(revision, S_IRUGO, show_revision, NULL);
@@ -88,6 +98,8 @@ static DEVICE_ATTR(revision, S_IRUGO, show_revision, NULL);
 #ifdef CONFIG_PM_SLEEP
 static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
     struct io_dev * io_dev = container_of(nb, struct io_dev, pm_notifier);
+
+    mutex_lock(&io_dev->lock);
 
     switch (action) {
         case PM_HIBERNATION_PREPARE:
@@ -105,6 +117,8 @@ static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
         default:
             break;
     }
+
+    mutex_unlock(&io_dev->lock);
 
     return NOTIFY_DONE;
 }
@@ -161,6 +175,10 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
 
         memset(io_dev, 0, sizeof(struct io_dev));
 
+        mutex_init(&io_dev->lock);
+
+        mutex_lock(&io_dev->lock);
+
         io_dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
 
         usb_set_intfdata(interface, io_dev);
@@ -202,6 +220,8 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
         register_pm_notifier(&io_dev->pm_notifier);
 #endif
 
+        mutex_unlock(&io_dev->lock);
+
         return 0;
 
     fail3:
@@ -211,7 +231,12 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
     fail1:
         usb_set_intfdata(interface, NULL);
         usb_put_dev(io_dev->usb_dev);
+
+        mutex_unlock(&io_dev->lock);
+
+        mutex_destroy(&io_dev->lock);
         kfree(io_dev);
+
         return result;
     } else {
         return -ENODEV;
@@ -226,6 +251,8 @@ static void io_disconnect(struct usb_interface *interface) {
     io_dev = usb_get_intfdata(interface);
 
     if (io_dev) {
+        mutex_lock(&io_dev->lock);
+
 #ifdef CONFIG_PM_SLEEP
         unregister_pm_notifier(&io_dev->pm_notifier);
 #endif
@@ -237,9 +264,11 @@ static void io_disconnect(struct usb_interface *interface) {
         device_remove_file(&interface->dev, &dev_attr_bootloader);
 
         usb_set_intfdata(interface, NULL);
-
         usb_put_dev(io_dev->usb_dev);
 
+        mutex_unlock(&io_dev->lock);
+
+        mutex_destroy(&io_dev->lock);
         kfree(io_dev);
     }
 }
