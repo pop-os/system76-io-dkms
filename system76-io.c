@@ -77,6 +77,14 @@ static ssize_t set_bootloader(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR(bootloader, S_IRUGO | S_IWUSR, show_bootloader, set_bootloader);
 
+static ssize_t show_revision(struct device *dev, struct device_attribute *attr, char *buf) {
+    struct io_dev * io_dev = dev_get_drvdata(dev);
+
+    return io_dev_revision(io_dev, buf, PAGE_SIZE, IO_TIMEOUT);
+}
+
+static DEVICE_ATTR(revision, S_IRUGO, show_revision, NULL);
+
 #ifdef CONFIG_PM_SLEEP
 static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
     struct io_dev * io_dev = container_of(nb, struct io_dev, pm_notifier);
@@ -175,12 +183,18 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
             goto fail1;
         }
 
+        result = device_create_file(&interface->dev, &dev_attr_revision);
+        if (result) {
+            dev_err(&interface->dev, "device_create_file failed: %d\n", result);
+            goto fail2;
+        }
+
         io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76_io", io_dev, io_groups);
         if (IS_ERR(io_dev->hwmon_dev)) {
             result = PTR_ERR(io_dev->hwmon_dev);
 
             dev_err(&interface->dev, "hwmon_device_register_with_groups failed: %d\n", result);
-            goto fail2;
+            goto fail3;
         }
 
 #ifdef CONFIG_PM_SLEEP
@@ -190,6 +204,8 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
 
         return 0;
 
+    fail3:
+        device_remove_file(&interface->dev, &dev_attr_revision);
     fail2:
         device_remove_file(&interface->dev, &dev_attr_bootloader);
     fail1:
@@ -215,6 +231,8 @@ static void io_disconnect(struct usb_interface *interface) {
 #endif
 
         hwmon_device_unregister(io_dev->hwmon_dev);
+
+        device_remove_file(&interface->dev, &dev_attr_revision);
 
         device_remove_file(&interface->dev, &dev_attr_bootloader);
 

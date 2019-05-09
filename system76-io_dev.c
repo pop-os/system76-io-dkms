@@ -307,3 +307,21 @@ static int io_dev_set_suspend(struct io_dev * io_dev, u16 value, int timeout) {
 
     return 0;
 }
+
+static int io_dev_revision(struct io_dev * io_dev, char * value, int value_len, int timeout) {
+    int len;
+    int result;
+
+    len = snprintf(io_dev->command, IO_MSG_SIZE, "IoREVISION\r");
+    if (len >= IO_MSG_SIZE) {
+        return -EINVAL;
+    }
+
+    result = io_dev_command(io_dev, io_dev->command, len, value, value_len, timeout);
+    if (result) {
+        dev_err(&io_dev->usb_dev->dev, "io_dev_revision failed: %d: %s\n", -result, value);
+        return result;
+    }
+
+    return 0;
+}
