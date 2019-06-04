@@ -32,7 +32,7 @@
 #define IO_INTF_DATA 1
 #define IO_EP_IN 0x83
 #define IO_EP_OUT 0x04
-#define IO_MSG_SIZE 16
+#define IO_MSG_SIZE 32
 #define IO_TIMEOUT 1000
 
 #include "system76-io_dev.c"
@@ -55,31 +55,51 @@ static ssize_t show_bootloader(struct device *dev, struct device_attribute *attr
 }
 
 static ssize_t set_bootloader(struct device *dev, struct device_attribute *attr, const char *buf, size_t size) {
-    struct io_dev * io_dev = dev_get_drvdata(dev);
-
     unsigned int val;
     int ret;
 
-    ret = kstrtouint(buf, 10, &val);
-    if (ret) {
-        return ret;
-    }
+    struct io_dev * io_dev = dev_get_drvdata(dev);
 
-    if (val) {
-        ret = io_dev_bootloader(io_dev, IO_TIMEOUT);
-        if(ret) {
-            return ret;
+    mutex_lock(&io_dev->lock);
+
+    ret = kstrtouint(buf, 10, &val);
+    if (!ret) {
+        if (val) {
+            ret = io_dev_bootloader(io_dev, IO_TIMEOUT);
+            if(!ret) {
+                ret = size;
+            }
         }
     }
 
-    return size;
+    mutex_unlock(&io_dev->lock);
+
+    return ret;
 }
 
 static DEVICE_ATTR(bootloader, S_IRUGO | S_IWUSR, show_bootloader, set_bootloader);
 
+static ssize_t show_revision(struct device *dev, struct device_attribute *attr, char *buf) {
+    int ret;
+
+    struct io_dev * io_dev = dev_get_drvdata(dev);
+
+    mutex_lock(&io_dev->lock);
+
+    ret = io_dev_revision(io_dev, buf, PAGE_SIZE, IO_TIMEOUT);
+
+    mutex_unlock(&io_dev->lock);
+
+    return ret;
+}
+
+static DEVICE_ATTR(revision, S_IRUGO, show_revision, NULL);
+
 #ifdef CONFIG_PM_SLEEP
 static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
     struct io_dev * io_dev = container_of(nb, struct io_dev, pm_notifier);
+
+    mutex_lock(&io_dev->lock);
 
     switch (action) {
         case PM_HIBERNATION_PREPARE:
@@ -97,6 +117,8 @@ static int io_pm(struct notifier_block *nb, unsigned long action, void *data) {
         default:
             break;
     }
+
+    mutex_unlock(&io_dev->lock);
 
     return NOTIFY_DONE;
 }
@@ -153,6 +175,10 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
 
         memset(io_dev, 0, sizeof(struct io_dev));
 
+        mutex_init(&io_dev->lock);
+
+        mutex_lock(&io_dev->lock);
+
         io_dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
 
         usb_set_intfdata(interface, io_dev);
@@ -175,12 +201,18 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
             goto fail1;
         }
 
+        result = device_create_file(&interface->dev, &dev_attr_revision);
+        if (result) {
+            dev_err(&interface->dev, "device_create_file failed: %d\n", result);
+            goto fail2;
+        }
+
         io_dev->hwmon_dev = hwmon_device_register_with_groups(&interface->dev, "system76_io", io_dev, io_groups);
         if (IS_ERR(io_dev->hwmon_dev)) {
             result = PTR_ERR(io_dev->hwmon_dev);
 
             dev_err(&interface->dev, "hwmon_device_register_with_groups failed: %d\n", result);
-            goto fail2;
+            goto fail3;
         }
 
 #ifdef CONFIG_PM_SLEEP
@@ -188,14 +220,23 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
         register_pm_notifier(&io_dev->pm_notifier);
 #endif
 
+        mutex_unlock(&io_dev->lock);
+
         return 0;
 
+    fail3:
+        device_remove_file(&interface->dev, &dev_attr_revision);
     fail2:
         device_remove_file(&interface->dev, &dev_attr_bootloader);
     fail1:
         usb_set_intfdata(interface, NULL);
         usb_put_dev(io_dev->usb_dev);
+
+        mutex_unlock(&io_dev->lock);
+
+        mutex_destroy(&io_dev->lock);
         kfree(io_dev);
+
         return result;
     } else {
         return -ENODEV;
@@ -210,18 +251,24 @@ static void io_disconnect(struct usb_interface *interface) {
     io_dev = usb_get_intfdata(interface);
 
     if (io_dev) {
+        mutex_lock(&io_dev->lock);
+
 #ifdef CONFIG_PM_SLEEP
         unregister_pm_notifier(&io_dev->pm_notifier);
 #endif
 
         hwmon_device_unregister(io_dev->hwmon_dev);
 
+        device_remove_file(&interface->dev, &dev_attr_revision);
+
         device_remove_file(&interface->dev, &dev_attr_bootloader);
 
         usb_set_intfdata(interface, NULL);
-
         usb_put_dev(io_dev->usb_dev);
 
+        mutex_unlock(&io_dev->lock);
+
+        mutex_destroy(&io_dev->lock);
         kfree(io_dev);
     }
 }
