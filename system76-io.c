@@ -58,7 +58,9 @@ static ssize_t set_bootloader(struct device *dev, struct device_attribute *attr,
     unsigned int val;
     int ret;
 
-    struct io_dev * io_dev = dev_get_drvdata(dev);
+    struct usb_device *usb_dev = to_usb_device(dev);
+    struct usb_interface *intf = usb_ifnum_to_if(usb_dev, 1);
+    struct io_dev *io_dev = usb_get_intfdata(intf);
 
     mutex_lock(&io_dev->lock);
 
@@ -82,7 +84,9 @@ static DEVICE_ATTR(bootloader, S_IRUGO | S_IWUSR, show_bootloader, set_bootloade
 static ssize_t show_revision(struct device *dev, struct device_attribute *attr, char *buf) {
     int ret;
 
-    struct io_dev * io_dev = dev_get_drvdata(dev);
+    struct usb_device *usb_dev = to_usb_device(dev);
+    struct usb_interface *intf = usb_ifnum_to_if(usb_dev, 1);
+    struct io_dev *io_dev = usb_get_intfdata(intf);
 
     mutex_lock(&io_dev->lock);
 
@@ -195,15 +199,15 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
             goto fail1;
         }
 
-        result = device_create_file(&interface->dev, &dev_attr_bootloader);
+        result = device_create_file(&io_dev->usb_dev->dev, &dev_attr_bootloader);
         if (result) {
-            dev_err(&interface->dev, "device_create_file failed: %d\n", result);
+            dev_err(&io_dev->usb_dev->dev, "device_create_file failed: %d\n", result);
             goto fail1;
         }
 
-        result = device_create_file(&interface->dev, &dev_attr_revision);
+        result = device_create_file(&io_dev->usb_dev->dev, &dev_attr_revision);
         if (result) {
-            dev_err(&interface->dev, "device_create_file failed: %d\n", result);
+            dev_err(&io_dev->usb_dev->dev, "device_create_file failed: %d\n", result);
             goto fail2;
         }
 
@@ -225,9 +229,9 @@ static int io_probe(struct usb_interface *interface, const struct usb_device_id 
         return 0;
 
     fail3:
-        device_remove_file(&interface->dev, &dev_attr_revision);
+        device_remove_file(&io_dev->usb_dev->dev, &dev_attr_revision);
     fail2:
-        device_remove_file(&interface->dev, &dev_attr_bootloader);
+        device_remove_file(&io_dev->usb_dev->dev, &dev_attr_bootloader);
     fail1:
         usb_set_intfdata(interface, NULL);
         usb_put_dev(io_dev->usb_dev);
@@ -259,9 +263,9 @@ static void io_disconnect(struct usb_interface *interface) {
 
         hwmon_device_unregister(io_dev->hwmon_dev);
 
-        device_remove_file(&interface->dev, &dev_attr_revision);
+        device_remove_file(&io_dev->usb_dev->dev, &dev_attr_revision);
 
-        device_remove_file(&interface->dev, &dev_attr_bootloader);
+        device_remove_file(&io_dev->usb_dev->dev, &dev_attr_bootloader);
 
         usb_set_intfdata(interface, NULL);
         usb_put_dev(io_dev->usb_dev);
