@@ -269,24 +269,6 @@ static int io_dev_set_duty(struct io_dev * io_dev, const char * device, u16 valu
     return 0;
 }
 
-static int io_dev_suspend(struct io_dev * io_dev, u16 * value, int timeout) {
-    int len;
-    int result;
-
-    len = snprintf(io_dev->command, IO_MSG_SIZE, "IoSUSP\r");
-    if (len >= IO_MSG_SIZE) {
-        return -EINVAL;
-    }
-
-    result = io_dev_command(io_dev, io_dev->command, len, io_dev->response, IO_MSG_SIZE, timeout);
-    if (result) {
-        dev_err(&io_dev->usb_dev->dev, "io_dev_suspend failed: %d: %s\n", -result, io_dev->response);
-        return result;
-    }
-
-    return kstrtou16(io_dev->response, 16, value);
-}
-
 static int io_dev_set_suspend(struct io_dev * io_dev, u16 value, int timeout) {
     int len;
     int result;
