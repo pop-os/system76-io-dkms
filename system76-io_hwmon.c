@@ -36,6 +36,7 @@ static const char * io_fan_name(int index) {
 }
 
 static ssize_t io_fan_input_show(struct device *dev, struct device_attribute *attr, char *buf) {
+    const char *name;
     u16 value;
     int ret;
 
@@ -43,8 +44,7 @@ static ssize_t io_fan_input_show(struct device *dev, struct device_attribute *at
 
     mutex_lock(&io_dev->lock);
 
-    const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
-    if (name) {
+    if ((name = io_fan_name(to_sensor_dev_attr(attr)->index))) {
         ret = io_dev_tach(io_dev, name, &value, IO_TIMEOUT);
         if (!ret) {
             ret = sprintf(buf, "%i\n", value * 30);
@@ -72,6 +72,7 @@ static ssize_t io_fan_label_show(struct device *dev, struct device_attribute *at
 }
 
 static ssize_t io_pwm_show(struct device *dev, struct device_attribute *attr, char *buf) {
+    const char *name;
     u16 value;
     int ret;
 
@@ -79,8 +80,7 @@ static ssize_t io_pwm_show(struct device *dev, struct device_attribute *attr, ch
 
     mutex_lock(&io_dev->lock);
 
-    const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
-    if (name) {
+    if ((name = io_fan_name(to_sensor_dev_attr(attr)->index))) {
         ret = io_dev_duty(io_dev, name, &value, IO_TIMEOUT);
         if (!ret) {
             ret = sprintf(buf, "%i\n", (((u32)value) * 255) / 10000);
@@ -95,6 +95,7 @@ static ssize_t io_pwm_show(struct device *dev, struct device_attribute *attr, ch
 }
 
 static ssize_t io_pwm_set(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
+	const char *name;
   	u32 value;
   	int ret;
 
@@ -102,8 +103,7 @@ static ssize_t io_pwm_set(struct device *dev, struct device_attribute *attr, con
 
     mutex_lock(&io_dev->lock);
 
-    const char * name = io_fan_name(to_sensor_dev_attr(attr)->index);
-    if (name) {
+    if ((name = io_fan_name(to_sensor_dev_attr(attr)->index))) {
       	ret = kstrtou32(buf, 10, &value);
       	if (!ret) {
             if (value <= 255) {
