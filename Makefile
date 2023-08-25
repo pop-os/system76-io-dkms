@@ -1,4 +1,4 @@
-obj-m := system76-io.o
+obj-m := system76-io.o system76-thelio-io.o
 KERNEL_DIR = /lib/modules/$(shell uname -r)/build
 
 all:

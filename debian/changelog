@@ -1,3 +1,9 @@
+system76-io-dkms (1.0.3) focal; urgency=medium
+
+  * Add thelio_io_2 driver
+
+ -- Jeremy Soller <jeremy@system76.com>  Fri, 25 Aug 2023 07:18:49 -0600
+
 system76-io-dkms (1.0.2) focal; urgency=medium
 
   * Fixes for Linux 5.18
