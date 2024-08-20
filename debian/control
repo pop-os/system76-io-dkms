@@ -10,7 +10,7 @@ Standards-Version: 4.1.1
 Homepage: https://github.com/pop-os/system76-io-dkms
 
 Package: system76-io-dkms
-Architecture: amd64
+Architecture: amd64 arm64
 Depends: ${misc:Depends}
 Description: System76 Io DKMS driver
  This DKMS driver controls System76 Io devices
