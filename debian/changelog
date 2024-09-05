@@ -1,3 +1,9 @@
+system76-io-dkms (1.0.4) focal; urgency=medium
+
+  * Build for arm64
+
+ -- Jeremy Soller <jeremy@system76.com>  Tue, 20 Aug 2024 16:01:44 -0600
+
 system76-io-dkms (1.0.3) focal; urgency=medium
 
   * Add thelio_io_2 driver
